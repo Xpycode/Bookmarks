@@ -1,0 +1,21 @@
+# Default Strato shared hosting is fine without rewrites — index.php handles routing.
+DirectoryIndex index.php
+
+# Hide dotfiles
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Don't list directories
+Options -Indexes
+
+# Force PHP files to be parsed (not served as plain text); harmless if unused.
+<FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+</FilesMatch>
