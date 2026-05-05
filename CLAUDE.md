@@ -2,7 +2,7 @@
 
 Self-hosted single-user bookmark manager. Replacement for Bookmarkninja, deployable to **Strato shared hosting** (Basic Starter / PowerPaket) via FTP.
 
-> Full project context lives in [`docs/00_base.md`](docs/00_base.md). Live state in [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md). Decisions in [`docs/decisions.md`](docs/decisions.md). Competitive landscape research in [`docs/feature-research-2026-05-05T12-04-18Z.md`](docs/feature-research-2026-05-05T12-04-18Z.md).
+> Full project context lives in [`docs/00_base.md`](docs/00_base.md). Live state in [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md). Decisions in [`docs/decisions.md`](docs/decisions.md). Competitive landscape research in [`docs/research/2026-05-05-bookmark-manager-landscape.md`](docs/research/2026-05-05-bookmark-manager-landscape.md).
 
 ## Tech Stack (locked in v1)
 
@@ -58,7 +58,18 @@ There's no test framework yet. For now: smoke-test parser changes against synthe
 
 ## Pointers
 
-- v1 build session: `docs/sessions/session-2026-05-05T11-55-38Z.md`
-- v2 backlog & competitive analysis: `docs/feature-research-2026-05-05T12-04-18Z.md`
+- v1 build session: `docs/sessions/2026-05-05a.md`
+- v2 backlog & competitive analysis: `docs/research/2026-05-05-bookmark-manager-landscape.md`
 - Deploy/operate: top-level `README.md`
 - Directions framework reference: `docs/00_base.md`
+
+## Folder structure (deliberate non-conformance to numbered-folder template)
+
+The Directions web template (`docs/13_folder-structure.md`) prescribes `01_Source/` / `02_Frontend/` / `03_Scripts/` / `04_Data/`. **This project deliberately does not use that layout** because:
+
+- `index.php` must stay at the repo root — Strato FTP deploys to docroot, Apache serves whatever's at the root. Moving it breaks the deploy contract.
+- `lib/`, `views/`, `public/` use `__DIR__`-relative `require` paths and Apache routing assumptions; renaming cascades through every file.
+- There is no "build step" — `public/` is both source and served output. The template's source-vs-frontend split assumes a build pipeline that doesn't exist here.
+- The PHP-conventional layout (`lib/` / `views/` / `public/` / `data/`) already provides the same separation-by-responsibility that numbered folders give for other project types.
+
+If a future maintainer thinks "let me reorg this to use the numbered folders" — read this section first, and if you still want to do it, you'll also need a wrapper `index.php` shim at the docroot that re-points everything, plus updates to all `__DIR__` requires and to `data/.htaccess` and `lib/.htaccess`.

@@ -10,9 +10,9 @@ Bookmarks — self-hosted PHP+SQLite bookmark manager for Strato shared hosting.
 
 | Date | Focus | Outcome | Log |
 |------|-------|---------|-----|
-| 2026-05-05 11:55 UTC | Build v1 from scratch (PHP 8 + SQLite) | Shipped working app — categories, drag&drop, search, dark mode, Netscape HTML import, single-user auth. Smoke-tested parser end-to-end. Committed `f4c0e9a` to `claude/bookmark-manager-import-juSnx`. | [log](session-2026-05-05T11-55-38Z.md) |
-| 2026-05-05 12:04 UTC | Survey bookmark-manager landscape, propose v2 backlog | Reviewed ~25 competing managers. Produced Top-10 prioritized additions list (tags, auto-fetch metadata, FTS5, REST API+bookmarklet, etc.). Committed `669f178` adding [feature-research](../feature-research-2026-05-05T12-04-18Z.md). | (no separate session log — research doc is the artifact) |
-| 2026-05-05 (this session) | Set up Directions on top of imported repo | Cloned `claude/bookmark-manager-import-juSnx` into local working dir. Installed Directions in `docs/`. Seeded `PROJECT_STATE.md` and `decisions.md` from prior session log + research doc. | _(write session log when this session ends)_ |
+| 2026-05-05 11:55 UTC | Build v1 from scratch (PHP 8 + SQLite) | Shipped working app — categories, drag&drop, search, dark mode, Netscape HTML import, single-user auth. Smoke-tested parser end-to-end. Committed `f4c0e9a` to `claude/bookmark-manager-import-juSnx`. | [log](2026-05-05a.md) |
+| 2026-05-05 12:04 UTC | Survey bookmark-manager landscape, propose v2 backlog | Reviewed ~25 competing managers. Produced Top-10 prioritized additions list (tags, auto-fetch metadata, FTS5, REST API+bookmarklet, etc.). Committed `669f178` adding [feature-research](../research/2026-05-05-bookmark-manager-landscape.md). | (no separate session log — research doc is the artifact) |
+| 2026-05-05 (session c) | Set up Directions on top of imported repo; commit + merge to main + push | Cloned `claude/bookmark-manager-import-juSnx` into local working dir. Installed Directions in `docs/`. Seeded `PROJECT_STATE.md` and `decisions.md` from prior session log + research doc. Committed `bd02f04` (172 files, 30 K insertions). Fast-forwarded `main` from `93739d3` → `bd02f04` and pushed both branches to origin. | [log](2026-05-05c.md) |
 
 ---
 

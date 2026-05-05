@@ -8,9 +8,9 @@
 docs-browser.html
 docs.sh
 
-# Session logs (project-specific, not template)
-sessions/*.md
-!sessions/_index.md
+# Session logs ARE the artifact in a consuming project — tracked.
+# (The original framework rule `sessions/*.md` was for the LLM-Directions
+# template repo itself, which doesn't want consumer session-log pollution.)
 
 # Syncthing temp files
 .syncthing.*.tmp

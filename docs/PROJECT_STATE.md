@@ -13,7 +13,7 @@
 ## Current Position
 - **Funnel:** plan
 - **Phase:** v1-shipped, picking v2 scope
-- **Focus:** Decide which items from `feature-research-2026-05-05T12-04-18Z.md` Top-10 list to bring into v2.
+- **Focus:** Decide which items from `research/2026-05-05-bookmark-manager-landscape.md` Top-10 list to bring into v2.
 - **Status:** ready
 - **Last updated:** 2026-05-05
 
