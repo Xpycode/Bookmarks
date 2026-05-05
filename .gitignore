@@ -5,3 +5,5 @@ data/*.sqlite-shm
 .DS_Store
 .vscode/
 .idea/
+.fastembed_cache/
+.claude/
