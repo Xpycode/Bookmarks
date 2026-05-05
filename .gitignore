@@ -7,3 +7,6 @@ data/*.sqlite-shm
 .idea/
 .fastembed_cache/
 .claude/
+
+# Deploy script — local only, contains SFTP credentials
+deploy.sh
