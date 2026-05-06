@@ -323,3 +323,148 @@ dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 0; ma
     .sidebar { border-right: 0; border-bottom: 1px solid var(--border); max-height: 280px; }
     .topbar-search { display: none; }
 }
+
+/* ---------- Dashboard view ---------- */
+.dashboard { overflow-y: auto; padding: 16px 24px 32px; }
+.dashboard.hidden { display: none; }
+.content.hidden { display: none; }
+button.ghost.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+.dashboard-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.dashboard-head h2 { margin: 0; font-size: 18px; }
+.dashboard-meta { font-size: 12px; color: var(--text-muted); }
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.dashboard-empty { color: var(--text-muted); padding: 60px 20px; text-align: center; }
+.dashboard-empty.hidden { display: none; }
+
+.dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.dash-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    background: var(--surface-2);
+    user-select: none;
+}
+.dash-card-head:hover { background: var(--accent); color: var(--accent-text); }
+.dash-card-head:hover .dash-card-count { background: rgba(255,255,255,.25); color: var(--accent-text); }
+.dash-card-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-card-count {
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    min-width: 22px;
+    text-align: center;
+}
+
+.dash-card-list { list-style: none; padding: 6px 0; margin: 0; }
+.dash-card-list li {
+    padding: 0;
+}
+.dash-card-list a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-card-list a:hover { background: var(--surface-2); text-decoration: none; }
+.dash-card-list .dash-fav {
+    width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0;
+    color: white; font-size: 10px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.dash-card-list .dash-bm-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dash-card-foot {
+    border-top: 1px solid var(--border);
+    padding: 6px 14px;
+}
+.dash-card-more {
+    background: transparent;
+    border: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 0;
+}
+.dash-card-more:hover { text-decoration: underline; }
+
+/* ---------- Bookmarklet link in import dialog ---------- */
+.dialog-sep { margin: 20px 0 16px; border: 0; border-top: 1px solid var(--border); }
+.dialog-hint { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; }
+.bookmarklet-link {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--accent);
+    color: var(--accent-text);
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: grab;
+    user-select: none;
+}
+.bookmarklet-link:hover { text-decoration: none; opacity: 0.9; }
+.bookmarklet-link:active { cursor: grabbing; }
+
+/* ---------- Quick-add popup page ---------- */
+.quickadd-body { padding: 20px; min-width: 0; }
+.quickadd { max-width: 480px; margin: 0 auto; }
+.quickadd h1 { margin: 0 0 16px; font-size: 18px; }
+.quickadd label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 12px;
+}
+.quickadd input, .quickadd select, .quickadd textarea {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+}
+.quickadd input:focus, .quickadd select:focus, .quickadd textarea:focus {
+    outline: 2px solid var(--accent); outline-offset: -1px;
+}
+.quickadd-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.quickadd-status { padding: 10px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+.quickadd-status.success { background: rgba(22,163,74,.12); color: var(--success); }
+.quickadd-status.error { background: rgba(220,38,38,.12); color: var(--danger); }

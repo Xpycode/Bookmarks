@@ -19,8 +19,13 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 - Renamed `docs/sessions/session-2026-05-05T11-55-38Z.md` → `docs/sessions/2026-05-05a.md` for naming consistency with the per-day suffix convention.
 - Moved `docs/feature-research-2026-05-05T12-04-18Z.md` → `docs/research/2026-05-05-bookmark-manager-landscape.md`.
 
-### Known issue
-- First deploy attempt (`bd02f04` → live) failed: Strato served `index.php` as a download instead of executing it (`Content-Type: application/x-httpd-php` returned the source verbatim). Cause: PHP not enabled for the `bookmarks.lucesumbrarum.com` subdomain in Strato's hosting control panel. Fix: enable PHP 8 for the subdomain in Strato's UI, then re-run `./03_Scripts/deploy.sh`. No code change needed.
+### Known issue (resolved)
+- First live deploy returned `index.php` as a download (`Content-Type: application/x-httpd-php`). **Initial diagnosis (PHP not enabled in Strato panel) was wrong.** Real cause: the v1 `.htaccess` shipped with `<FilesMatch "\.php$"> SetHandler application/x-httpd-php </FilesMatch>` — a mod_php directive. Strato uses PHP-FastCGI (verified by inspecting LUCESUMBRARUM, apps.lucesumbrarum.com, RemoteInterviewSetupGuide — three working PHP sites with zero PHP-handler directives between them). On FastCGI, that directive doesn't get ignored — Apache literally puts `application/x-httpd-php` into the response Content-Type header, so the browser downloads instead of executing. Fix: removed the entire `<FilesMatch "\.php$">` block from `01_Source/.htaccess`; PHP defaults work. `curl -I` after fix returns `text/html` + `x-powered-by: PHP/8.4.20`. Site live.
+
+### Added (continued)
+- Bug fix: Cancel button in the Add-bookmark dialog now closes the dialog. Was previously blocked by HTML5 `required`-field validation firing before the JS cancel branch could run. One-attribute fix: `formnovalidate` on the Cancel button.
+- **Bookmarklet** (quickadd) — new `?r=quickadd` route + `views/quickadd.php`. Handles its own auth (preserves URL/title query params across login). Pre-filled form, category dropdown, last-used category remembered in localStorage, saves via existing `add_bookmark` API then `window.close()`. Bookmarklet UI lives in the Import dialog: a draggable styled `<a href="javascript:…">+ Bookmarks</a>` that opens a 520×640 popup.
+- **Dashboard view** — new `▦ Dashboard` toggle in the topbar cycles list ⇄ dashboard (persisted in localStorage). Dashboard renders all categories with direct bookmarks as cards in a CSS-Grid `repeat(auto-fill, minmax(320px, 1fr))` layout: title (full breadcrumb path), count badge, top 7 bookmarks, "+ N more" button. Cards rendered in tree order (depth-first traversal). Click card header → drills into list view of that category.
 
 ---
 

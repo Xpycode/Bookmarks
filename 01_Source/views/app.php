@@ -22,7 +22,8 @@ $importedBms = (int)($_GET['b'] ?? 0);
         <input id="search" type="search" placeholder="Search bookmarks…" autocomplete="off">
     </div>
     <div class="topbar-right">
-        <button id="import-btn" class="ghost" type="button" title="Import HTML bookmarks">Import</button>
+        <button id="view-toggle" class="ghost" type="button" title="Toggle dashboard / list view">▦ Dashboard</button>
+        <button id="import-btn" class="ghost" type="button" title="Import / bookmarklet">Import</button>
         <button id="theme-toggle" class="ghost" type="button" title="Toggle dark mode">🌓</button>
         <a class="ghost" href="index.php?r=logout">Sign out</a>
     </div>
@@ -57,6 +58,14 @@ $importedBms = (int)($_GET['b'] ?? 0);
         <ul id="bookmark-list" class="bookmark-list"></ul>
         <div id="empty-state" class="empty">No bookmarks yet — pick a category or click <em>+ Bookmark</em>.</div>
     </section>
+    <section class="dashboard hidden" id="dashboard">
+        <div class="dashboard-head">
+            <h2>All categories</h2>
+            <span class="dashboard-meta" id="dashboard-meta"></span>
+        </div>
+        <div class="dashboard-grid" id="dashboard-grid"></div>
+        <div class="dashboard-empty hidden" id="dashboard-empty">No categories with bookmarks yet.</div>
+    </section>
 </main>
 
 <div id="search-results" class="search-results hidden"></div>
@@ -68,7 +77,7 @@ $importedBms = (int)($_GET['b'] ?? 0);
         <label>URL<input type="url" name="url" required placeholder="https://…"></label>
         <label>Notes<textarea name="notes" rows="3" maxlength="2000"></textarea></label>
         <menu>
-            <button value="cancel" class="ghost">Cancel</button>
+            <button value="cancel" class="ghost" formnovalidate>Cancel</button>
             <button value="ok" class="primary" id="bookmark-save">Save</button>
         </menu>
     </form>
@@ -86,6 +95,23 @@ $importedBms = (int)($_GET['b'] ?? 0);
             <button type="submit" class="primary">Import</button>
         </menu>
     </form>
+
+    <hr class="dialog-sep">
+
+    <h3>Quick-add bookmarklet</h3>
+    <p>Drag the link below to your browser's bookmarks bar. Clicking it on any page opens a small popup that saves that page here.</p>
+    <p>
+    <?php
+    $scheme = (
+        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+    ) ? 'https' : 'http';
+    $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $bookmarklet = "javascript:(function(){var u=encodeURIComponent(location.href);var t=encodeURIComponent(document.title);window.open('" . $origin . "/?r=quickadd&url='+u+'&title='+t,'BookmarkAdd','width=520,height=640');})();";
+    ?>
+        <a class="bookmarklet-link" href="<?= htmlspecialchars($bookmarklet) ?>" draggable="true" onclick="event.preventDefault();return false;">+ Bookmarks</a>
+    </p>
+    <p class="dialog-hint">Tip: if your bookmarks bar is hidden, show it first (⌘⇧B in Safari/Chrome).</p>
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>

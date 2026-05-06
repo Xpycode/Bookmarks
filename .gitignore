@@ -10,3 +10,8 @@
 
 # Deploy script — local only, contains SFTP credentials
 03_Scripts/deploy.sh
+
+# Exports — bookmark HTML files, DB dumps, etc. May contain personal/private
+# data (URLs, tokens, LAN IPs). Never commit. Keep .gitkeep so the folder exists.
+04_Exports/*
+!04_Exports/.gitkeep

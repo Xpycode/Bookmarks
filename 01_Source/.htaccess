@@ -15,7 +15,10 @@ DirectoryIndex index.php
 # Don't list directories
 Options -Indexes
 
-# Force PHP files to be parsed (not served as plain text); harmless if unused.
-<FilesMatch "\.php$">
-    SetHandler application/x-httpd-php
-</FilesMatch>
+# NOTE: NO PHP-handler directive. Strato has PHP enabled by default on this
+# account; adding `SetHandler application/x-httpd-php` here actually BREAKS
+# execution because Strato uses PHP-FastCGI (not mod_php), and it then sends
+# back the file with Content-Type: application/x-httpd-php as a literal label.
+# Confirmed by inspecting LUCESUMBRARUM, apps.lucesumbrarum.com, and
+# RemoteInterviewSetupGuide — all working PHP sites, none have a PHP handler
+# directive. See CHANGELOG.md "Known issue" entry for the full diagnosis.

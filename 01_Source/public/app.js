@@ -310,6 +310,10 @@
                 await load();
             },
         });
+
+        // Refresh dashboard if it's the active view (so cards stay in sync
+        // when actions happen via the sidebar while dashboard is showing).
+        if (state.viewMode === 'dashboard') renderDashboard();
     };
 
     /* ---------- Category actions ---------- */
@@ -464,9 +468,145 @@
         searchResults.classList.remove('hidden');
     };
 
-    /* ---------- Boot ---------- */
-    load().catch(err => {
-        console.error(err);
-        alert('Failed to load: ' + err.message);
+    /* ---------- Dashboard view ---------- */
+    // View mode: 'list' (default) or 'dashboard'. Persisted in localStorage.
+    state.viewMode = localStorage.getItem('viewMode') || 'list';
+
+    const setView = (mode) => {
+        state.viewMode = mode;
+        localStorage.setItem('viewMode', mode);
+        const dash = $('#dashboard');
+        const content = $('.content');
+        const toggle = $('#view-toggle');
+        if (mode === 'dashboard') {
+            content.classList.add('hidden');
+            dash.classList.remove('hidden');
+            toggle.classList.add('active');
+            toggle.title = 'Switch to list view';
+            renderDashboard();
+        } else {
+            dash.classList.add('hidden');
+            content.classList.remove('hidden');
+            toggle.classList.remove('active');
+            toggle.title = 'Switch to dashboard view';
+        }
+    };
+
+    // Tree-order traversal: top-level cats in sort_order, then their children
+    // (recursive). Only includes categories that have direct bookmarks — pure
+    // navigation parents (DW with sub-categories but no direct items) are
+    // skipped because they'd render as empty cards.
+    const dashboardCategories = () => {
+        const result = [];
+        const visit = (parentId) => {
+            for (const cat of childrenOf(parentId)) {
+                if (bookmarksOf(cat.id).length > 0) result.push(cat);
+                visit(cat.id);
+            }
+        };
+        visit(null);
+        return result;
+    };
+
+    const DASH_PREVIEW = 7;  // max bookmarks shown per card before "+ N more"
+
+    const renderDashboard = () => {
+        const grid = $('#dashboard-grid');
+        const emptyEl = $('#dashboard-empty');
+        const meta = $('#dashboard-meta');
+        grid.replaceChildren();
+
+        const cats = dashboardCategories();
+        if (cats.length === 0) {
+            emptyEl.classList.remove('hidden');
+            meta.textContent = '';
+            return;
+        }
+        emptyEl.classList.add('hidden');
+        const totalBms = cats.reduce((sum, c) => sum + bookmarksOf(c.id).length, 0);
+        meta.textContent = `${cats.length} categor${cats.length === 1 ? 'y' : 'ies'} · ${totalBms} bookmark${totalBms === 1 ? '' : 's'}`;
+
+        for (const cat of cats) {
+            const bms = bookmarksOf(cat.id);
+            const card = document.createElement('article');
+            card.className = 'dash-card';
+            card.dataset.id = cat.id;
+
+            // Header (clickable → list view of that category)
+            const head = document.createElement('header');
+            head.className = 'dash-card-head';
+            const title = document.createElement('h3');
+            title.className = 'dash-card-title';
+            title.textContent = categoryPath(cat.id);
+            const count = document.createElement('span');
+            count.className = 'dash-card-count';
+            count.textContent = String(bms.length);
+            head.appendChild(title);
+            head.appendChild(count);
+            head.addEventListener('click', () => {
+                setView('list');
+                selectCategory(cat.id);
+            });
+            card.appendChild(head);
+
+            // Body: top N bookmarks as a list
+            const list = document.createElement('ul');
+            list.className = 'dash-card-list';
+            const preview = bms.slice(0, DASH_PREVIEW);
+            for (const bm of preview) {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = bm.url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.title = bm.title + '\n' + bm.url;
+                const fav = document.createElement('span');
+                fav.className = 'dash-fav';
+                fav.style.background = colorFor(domainFor(bm.url));
+                fav.textContent = initialFor(bm.url);
+                const t = document.createElement('span');
+                t.className = 'dash-bm-title';
+                t.textContent = bm.title;
+                a.appendChild(fav);
+                a.appendChild(t);
+                li.appendChild(a);
+                list.appendChild(li);
+            }
+            card.appendChild(list);
+
+            // Footer: "+ N more" if there are extras
+            if (bms.length > DASH_PREVIEW) {
+                const foot = document.createElement('footer');
+                foot.className = 'dash-card-foot';
+                const more = document.createElement('button');
+                more.className = 'dash-card-more';
+                more.type = 'button';
+                more.textContent = `+ ${bms.length - DASH_PREVIEW} more`;
+                more.addEventListener('click', () => {
+                    setView('list');
+                    selectCategory(cat.id);
+                });
+                foot.appendChild(more);
+                card.appendChild(foot);
+            }
+            grid.appendChild(card);
+        }
+    };
+
+    // Toggle button: cycles list ⇄ dashboard.
+    $('#view-toggle').addEventListener('click', () => {
+        setView(state.viewMode === 'dashboard' ? 'list' : 'dashboard');
     });
+
+    /* ---------- Boot ---------- */
+    load()
+        .then(() => {
+            // Apply saved view mode after data is loaded so dashboard can render
+            // with real categories instead of an empty grid.
+            setView(state.viewMode);
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Failed to load: ' + err.message);
+        });
 })();

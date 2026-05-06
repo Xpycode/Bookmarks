@@ -32,6 +32,15 @@ if (!isSetup()) {
     exit;
 }
 
+// Quick-add route — handled BEFORE the global auth gate because it renders
+// its own login form that preserves the ?url=&title= query string across
+// submission. The standard login.php redirects to index.php (no params),
+// which would lose the bookmarklet's payload.
+if ($route === 'quickadd') {
+    include __DIR__ . '/views/quickadd.php';
+    exit;
+}
+
 if (!isAuthed()) {
     $error = '';
     if ($route === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
