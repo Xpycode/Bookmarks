@@ -57,16 +57,22 @@ Deferred (HARD or scope-creep): AI auto-tag/auto-summary, semantic-search embedd
 
 ## Architecture (current)
 
+PHP app lives under `01_Source/` (numbered-folder convention shared across the user's `3-Websites/*` projects). Deploy script lives at `03_Scripts/deploy.sh`.
+
 ```
-index.php           Router: setup / login / api / import / app
-lib/db.php          PDO SQLite + schema bootstrap (settings, categories, bookmarks)
-lib/auth.php        Session, bcrypt, CSRF
-lib/api.php         JSON API (POST, X-CSRF-Token required for mutations)
-lib/parser.php      Netscape HTML parser + tree-to-DB importer
-views/              setup.php, login.php, app.php (UI shell)
-public/             app.css, app.js (Sortable.js from jsDelivr)
-data/               bookmarks.sqlite (web-blocked via .htaccess)
-docs/               Directions + research + session logs
+01_Source/
+  index.php         Router: setup / login / api / import / app
+  .htaccess         DirectoryIndex, PHP handler, hide dotfiles
+  lib/db.php        PDO SQLite + schema bootstrap (settings, categories, bookmarks)
+  lib/auth.php      Session, bcrypt, CSRF
+  lib/api.php       JSON API (POST, X-CSRF-Token required for mutations)
+  lib/parser.php    Netscape HTML parser + tree-to-DB importer
+  lib/.htaccess     Deny direct PHP-include access
+  views/            setup.php, login.php, app.php (UI shell)
+  public/           app.css, app.js (Sortable.js from jsDelivr)
+  data/             bookmarks.sqlite (web-blocked via data/.htaccess)
+03_Scripts/deploy.sh  lftp mirror to bookmarks.lucesumbrarum.com (gitignored)
+docs/                 PROJECT_STATE, decisions, sessions/, research/ (only)
 ```
 
 Schema: `settings(key,value)`, `categories(id,name,parent_id,sort_order)`, `bookmarks(id,category_id,title,url,notes,sort_order,created_at)`. WAL + foreign keys ON.

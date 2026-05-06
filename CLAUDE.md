@@ -14,19 +14,39 @@ Self-hosted single-user bookmark manager. Replacement for Bookmarkninja, deploya
 
 **Hard constraints:** anything that requires Node, Composer, MySQL, Docker, or a persistent process is out — Strato shared hosting doesn't support it.
 
-## Architecture
+## Folder structure
+
+Numbered-folder convention shared across all `3-Websites/*` projects:
 
 ```
-index.php           Router: setup / login / api / import / app
-lib/db.php          PDO SQLite + schema bootstrap
-lib/auth.php        Session, bcrypt, CSRF token
-lib/api.php         JSON API (POST + X-CSRF-Token for mutations)
-lib/parser.php      Netscape HTML bookmark parser + tree importer
-views/              setup.php, login.php, app.php
-public/             app.css, app.js
-data/               SQLite DB (web-blocked via .htaccess)
-docs/               Directions + research + session logs
+Bookmarks/
+├── 01_Source/             ← THE PHP APP (everything that gets deployed)
+│   ├── index.php          Router: setup / login / api / import / app
+│   ├── .htaccess          DirectoryIndex, hide dotfiles, PHP handler
+│   ├── lib/
+│   │   ├── db.php         PDO SQLite + schema bootstrap
+│   │   ├── auth.php       Session, bcrypt, CSRF token
+│   │   ├── api.php        JSON API (POST + X-CSRF-Token for mutations)
+│   │   ├── parser.php     Netscape HTML bookmark parser + tree importer
+│   │   └── .htaccess      Deny all (block direct PHP-include access)
+│   ├── views/             setup.php, login.php, app.php
+│   ├── public/            app.css, app.js
+│   └── data/              SQLite DB (web-blocked via data/.htaccess)
+├── 02_Design/             ← UI mockups / design source files (empty placeholder)
+├── 03_Screenshots/        ← UI screenshots (empty placeholder)
+├── 03_Scripts/
+│   └── deploy.sh          gitignored — SFTP creds, lftp mirror to Strato
+├── 04_Exports/            ← N/A for PHP (empty placeholder)
+├── docs/                  ← project docs only (PROJECT_STATE, decisions,
+│                            sessions/, research/); LLM-Directions framework
+│                            files live on disk but are gitignored
+├── CHANGELOG.md, CLAUDE.md, README.md, LICENSE, .gitignore
 ```
+
+**Why `01_Source/`?** Matches the convention used across the user's other web
+projects (LUCESUMBRARUM, LEARNING, KinoBerlin) so the work-folder layout is
+the same everywhere. PHP `__DIR__` requires still work because the entire app
+subtree moves together — `__DIR__` resolves to wherever the calling file lives.
 
 API: `POST index.php?r=api&action=…`. Mutating actions require `X-CSRF-Token` header. Import: `POST index.php?r=import` (multipart, `csrf` field + `file` field).
 
@@ -63,13 +83,12 @@ There's no test framework yet. For now: smoke-test parser changes against synthe
 - Deploy/operate: top-level `README.md`
 - Directions framework reference: `docs/00_base.md`
 
-## Folder structure (deliberate non-conformance to numbered-folder template)
+## Deploy
 
-The Directions web template (`docs/13_folder-structure.md`) prescribes `01_Source/` / `02_Frontend/` / `03_Scripts/` / `04_Data/`. **This project deliberately does not use that layout** because:
+`03_Scripts/deploy.sh` (gitignored — contains SFTP credentials) builds a stage
+dir from `01_Source/`, normalizes file/dir perms to 644/755, and `lftp mirror`s
+to `bookmarks.lucesumbrarum.com`. **The SQLite DB on the server is never
+touched** — `01_Source/data/bookmarks.sqlite*` is excluded from the stage, so
+even if the live DB existed in the local data/ dir it wouldn't ship.
 
-- `index.php` must stay at the repo root — Strato FTP deploys to docroot, Apache serves whatever's at the root. Moving it breaks the deploy contract.
-- `lib/`, `views/`, `public/` use `__DIR__`-relative `require` paths and Apache routing assumptions; renaming cascades through every file.
-- There is no "build step" — `public/` is both source and served output. The template's source-vs-frontend split assumes a build pipeline that doesn't exist here.
-- The PHP-conventional layout (`lib/` / `views/` / `public/` / `data/`) already provides the same separation-by-responsibility that numbered folders give for other project types.
-
-If a future maintainer thinks "let me reorg this to use the numbered folders" — read this section first, and if you still want to do it, you'll also need a wrapper `index.php` shim at the docroot that re-points everything, plus updates to all `__DIR__` requires and to `data/.htaccess` and `lib/.htaccess`.
+Usage: `./03_Scripts/deploy.sh --dry-run` then `./03_Scripts/deploy.sh`.

@@ -1,32 +1,21 @@
 # macOS
 .DS_Store
 
-# Archive (internal artifacts, not for distribution)
-.archive/
-
-# Local/personal files (not part of the system)
-docs-browser.html
-docs.sh
-
-# Session logs ARE the artifact in a consuming project — tracked.
-# (The original framework rule `sessions/*.md` was for the LLM-Directions
-# template repo itself, which doesn't want consumer session-log pollution.)
-
-# Syncthing temp files
-.syncthing.*.tmp
-*.sync-conflict-*
-
 # Embedding cache
 .fastembed_cache/
 
-# Serena tool cache
-.serena/
+# ── Framework files: kept on disk for Claude reference, NOT tracked here ──
+# The LLM-Directions framework (00_*.md, commands/, cookbook/, hooks/, etc.)
+# lives upstream at github.com/Xpycode/LLM-Directions and re-clones via /setup
+# when needed. Tracking it in this project's repo just bloats history.
+#
+# Strategy: ignore everything in docs/ root by default, then explicitly
+# re-include the project-authored artifacts.
 
-# Skills managed externally by npx skills
-.claude/skills/
-.agents/
+/*
 
-# But keep Claude settings as reference
-!.claude/settings.local.json
-
-.cowork/
+!/.gitignore
+!/PROJECT_STATE.md
+!/decisions.md
+!/sessions
+!/research

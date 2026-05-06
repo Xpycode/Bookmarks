@@ -1,7 +1,7 @@
-data/*.sqlite
-data/*.sqlite-journal
-data/*.sqlite-wal
-data/*.sqlite-shm
+01_Source/data/*.sqlite
+01_Source/data/*.sqlite-journal
+01_Source/data/*.sqlite-wal
+01_Source/data/*.sqlite-shm
 .DS_Store
 .vscode/
 .idea/
@@ -9,4 +9,4 @@ data/*.sqlite-shm
 .claude/
 
 # Deploy script — local only, contains SFTP credentials
-deploy.sh
+03_Scripts/deploy.sh

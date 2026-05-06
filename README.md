@@ -17,36 +17,55 @@ Self-hosted single-user bookmark manager. PHP 8 + SQLite, vanilla JS frontend, n
 - Apache `.htaccess` support (default on Strato).
 - Nothing else — no Composer, no Node, no MySQL.
 
-## Deploy to Strato (FTP)
+## Deploy to Strato
 
-1. Upload the entire repository to a directory under your domain (e.g. `/bookmarks/` or the document root of a subdomain).
-2. Make sure the `data/` directory is writable by PHP. On Strato shared hosting it usually is by default; if not, `chmod 755 data` via FTP.
-3. Visit your URL in the browser. You'll see the **first-run setup** page — pick a password (≥ 8 characters).
-4. After setup you're logged in. Click **Import** to upload your existing bookmark HTML.
+Use `./03_Scripts/deploy.sh`. It uses `lftp` over SFTP, mirrors `01_Source/`
+to the subdomain's docroot, normalizes file perms (644/755), and never touches
+the server's `data/bookmarks.sqlite` (the file is excluded from the stage).
 
-The SQLite database is stored at `data/bookmarks.sqlite`. It is blocked from direct web access by `data/.htaccess`. Back it up by downloading that single file.
+Manual fallback: SFTP-upload everything in `01_Source/` to your domain's
+docroot. Make sure `data/` is writable by PHP (Strato grants this by default).
+
+Visit the URL in a browser. You'll see the **first-run setup** page — pick a
+password (≥ 8 characters). After setup you're logged in; click **Import** to
+upload your existing bookmark HTML.
+
+The SQLite database lives at `data/bookmarks.sqlite` (web-blocked via
+`data/.htaccess`). Back it up by downloading that one file via SFTP.
 
 ## Updating later
 
-Replace the PHP/JS/CSS files via FTP. Don't overwrite `data/`.
+Just re-run `./03_Scripts/deploy.sh`. The DB on the server is preserved.
 
 ## Project layout
 
+The deployable PHP app lives under `01_Source/`. The other top-level folders
+are organizational placeholders shared with the project's sibling websites.
+
 ```
-index.php           Router (login, setup, API, import, app)
-lib/
-  db.php            SQLite connection + schema
-  auth.php          Session, password, CSRF
-  api.php           JSON API handlers
-  parser.php        Netscape HTML bookmark parser + tree importer
-views/
-  setup.php         First-run password setup
-  login.php         Sign-in form
-  app.php           Main UI shell
-public/
-  app.css           Styles (light + dark)
-  app.js            Frontend (categories, bookmarks, search, drag&drop)
-data/               SQLite DB lives here (web-blocked)
+01_Source/            ← Everything in here gets deployed.
+  index.php           Router (login, setup, API, import, app)
+  .htaccess           DirectoryIndex, PHP handler, hide dotfiles
+  lib/
+    db.php            SQLite connection + schema
+    auth.php          Session, password, CSRF
+    api.php           JSON API handlers
+    parser.php        Netscape HTML bookmark parser + tree importer
+    .htaccess         Deny direct access to PHP includes
+  views/
+    setup.php         First-run password setup
+    login.php         Sign-in form
+    app.php           Main UI shell
+  public/
+    app.css           Styles (light + dark)
+    app.js            Frontend (categories, bookmarks, search, drag&drop)
+  data/
+    .htaccess         Deny all (web-blocks the SQLite file)
+    bookmarks.sqlite  Created on first visit; gitignored.
+03_Scripts/
+  deploy.sh           SFTP deploy via lftp (gitignored — contains creds)
+02_Design/, 03_Screenshots/, 04_Exports/   placeholders (mirror sibling projects)
+docs/                 Project documentation
 ```
 
 ## API endpoints (all under `index.php?r=api&action=…`)
@@ -70,10 +89,10 @@ Import is `POST index.php?r=import` with multipart `file` field plus `csrf` toke
 
 ## Resetting the password
 
-There's no "forgot password" — it's a single-user, locally-stored hash. To reset without losing data, open `data/bookmarks.sqlite` in any SQLite client and run:
+There's no "forgot password" — it's a single-user, locally-stored hash. To reset without losing data, open `01_Source/data/bookmarks.sqlite` (or the one on the server, downloaded via SFTP) in any SQLite client and run:
 
 ```sql
 DELETE FROM settings WHERE key = 'password_hash';
 ```
 
-Then revisit the site to set a new one. To wipe everything, just delete `data/bookmarks.sqlite` and run setup again.
+Then revisit the site to set a new one. To wipe everything, delete `data/bookmarks.sqlite` and run setup again.
