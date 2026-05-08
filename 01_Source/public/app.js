@@ -49,8 +49,12 @@
         const data = await api('list');
         state.categories = data.categories;
         state.bookmarks = data.bookmarks;
+        state.views = Array.isArray(data.views) ? data.views : [];
+        state.currentViewId = data.current_view_id ?? (state.views[0]?.id ?? null);
         renderTree();
         renderBookmarks();
+        renderViewPicker();
+        if (state.viewMode === 'dashboard') renderDashboard();
     };
 
     /* ---------- Helpers ---------- */
@@ -311,9 +315,6 @@
             },
         });
 
-        // Refresh dashboard if it's the active view (so cards stay in sync
-        // when actions happen via the sidebar while dashboard is showing).
-        if (state.viewMode === 'dashboard') renderDashboard();
     };
 
     /* ---------- Category actions ---------- */
@@ -469,133 +470,395 @@
     };
 
     /* ---------- Dashboard view ---------- */
-    // View mode: 'list' (default) or 'dashboard'. Persisted in localStorage.
     state.viewMode = localStorage.getItem('viewMode') || 'list';
+    state.views = [];
+    state.currentViewId = null;
+    state.showHidden = localStorage.getItem('showHidden') === '1';
+    let gridSortable = null;
+
+    const currentView = () => state.views.find(v => v.id === state.currentViewId) || state.views[0] || null;
+
+    const colorForCard = (cat) => cat.color || colorFor('cat-' + cat.id);
+    // The HSL fallback isn't a hex value; <input type=color> needs hex. Use a
+    // neutral default for the picker if no custom color is set yet.
+    const pickerInitial = (cat) => cat.color || '#5b6b7c';
 
     const setView = (mode) => {
         state.viewMode = mode;
         localStorage.setItem('viewMode', mode);
-        const dash = $('#dashboard');
-        const content = $('.content');
+        document.body.classList.toggle('dashboard-mode', mode === 'dashboard');
+        $('.content').classList.toggle('hidden', mode === 'dashboard');
+        $('#dashboard').classList.toggle('hidden', mode !== 'dashboard');
         const toggle = $('#view-toggle');
-        if (mode === 'dashboard') {
-            content.classList.add('hidden');
-            dash.classList.remove('hidden');
-            toggle.classList.add('active');
-            toggle.title = 'Switch to list view';
-            renderDashboard();
-        } else {
-            dash.classList.add('hidden');
-            content.classList.remove('hidden');
-            toggle.classList.remove('active');
-            toggle.title = 'Switch to dashboard view';
+        toggle.classList.toggle('active', mode === 'dashboard');
+        toggle.title = mode === 'dashboard' ? 'Switch to list view' : 'Switch to dashboard view';
+        if (mode === 'dashboard') renderDashboard();
+        else closeContextMenu();
+    };
+
+    // Eligible cats = anything with at least one direct bookmark and (unless
+    // showHidden is on) not in the current view's hidden set. Order them by
+    // the current view's saved order, then append any new categories at the end.
+    const dashboardCategories = () => {
+        const view = currentView();
+        if (!view) return [];
+        let eligible = state.categories.filter(c => bookmarksOf(c.id).length > 0);
+        const hiddenSet = new Set(view.hidden_ids || []);
+        if (!state.showHidden) eligible = eligible.filter(c => !hiddenSet.has(c.id));
+        const byId = new Map(eligible.map(c => [c.id, c]));
+        const out = [];
+        const seen = new Set();
+        for (const id of (view.dashboard_order || [])) {
+            if (byId.has(id)) { out.push(byId.get(id)); seen.add(id); }
+        }
+        for (const cat of eligible) if (!seen.has(cat.id)) out.push(cat);
+        return out;
+    };
+
+    const hiddenEligibleCount = () => {
+        const view = currentView();
+        if (!view) return 0;
+        const hiddenSet = new Set(view.hidden_ids || []);
+        return state.categories.filter(c =>
+            bookmarksOf(c.id).length > 0 && hiddenSet.has(c.id)
+        ).length;
+    };
+
+    const setHidden = async (catId, hidden) => {
+        const view = currentView();
+        if (!view) return;
+        const set = new Set(view.hidden_ids || []);
+        if (hidden) set.add(catId); else set.delete(catId);
+        view.hidden_ids = [...set];
+        await api('set_view_hidden', { view_id: view.id, ids: view.hidden_ids });
+        renderDashboard();
+    };
+
+    // Color picker: a real <dialog> with a visible <input type="color">.
+    // Programmatic .click() on an offscreen color input is silently blocked by
+    // Safari, so we open a modal instead. Save / Reset / Cancel are explicit.
+    const colorDialog = $('#color-dialog');
+    const colorInput = $('#color-input');
+    const colorTargetLabel = $('#color-dialog-target');
+    let pendingColorCat = null;
+
+    const changeCategoryColor = (cat) => {
+        pendingColorCat = cat;
+        colorInput.value = pickerInitial(cat);
+        colorTargetLabel.textContent = categoryPath(cat.id);
+        colorDialog.showModal();
+    };
+
+    $('#color-save').addEventListener('click', async () => {
+        if (!pendingColorCat) return;
+        const id = pendingColorCat.id;
+        const color = colorInput.value;
+        pendingColorCat = null;
+        colorDialog.close();
+        await api('set_category_color', { id, color });
+        await load();
+    });
+    $('#color-reset').addEventListener('click', async () => {
+        if (!pendingColorCat) return;
+        const id = pendingColorCat.id;
+        pendingColorCat = null;
+        colorDialog.close();
+        await api('set_category_color', { id, color: null });
+        await load();
+    });
+    colorDialog.querySelector('[data-close]').addEventListener('click', () => {
+        pendingColorCat = null;
+        colorDialog.close();
+    });
+
+    const persistDashboardOrder = (ids) => {
+        const view = currentView();
+        if (!view) return;
+        view.dashboard_order = ids;
+        api('set_view_order', { view_id: view.id, ids }).catch(err => console.error('save order:', err));
+    };
+
+    const renderDashboardMeta = (visibleCount, totalBms) => {
+        const meta = $('#dashboard-meta');
+        meta.replaceChildren();
+        if (visibleCount > 0) {
+            const txt = document.createElement('span');
+            txt.textContent = `${visibleCount} categor${visibleCount === 1 ? 'y' : 'ies'} · ${totalBms} bookmark${totalBms === 1 ? '' : 's'}`;
+            meta.appendChild(txt);
+        }
+        const hiddenN = hiddenEligibleCount();
+        if (hiddenN > 0) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dash-show-hidden';
+            btn.textContent = state.showHidden ? `Hide ${hiddenN} hidden` : `Show ${hiddenN} hidden`;
+            btn.addEventListener('click', () => {
+                state.showHidden = !state.showHidden;
+                localStorage.setItem('showHidden', state.showHidden ? '1' : '0');
+                renderDashboard();
+            });
+            meta.appendChild(btn);
         }
     };
-
-    // Tree-order traversal: top-level cats in sort_order, then their children
-    // (recursive). Only includes categories that have direct bookmarks — pure
-    // navigation parents (DW with sub-categories but no direct items) are
-    // skipped because they'd render as empty cards.
-    const dashboardCategories = () => {
-        const result = [];
-        const visit = (parentId) => {
-            for (const cat of childrenOf(parentId)) {
-                if (bookmarksOf(cat.id).length > 0) result.push(cat);
-                visit(cat.id);
-            }
-        };
-        visit(null);
-        return result;
-    };
-
-    const DASH_PREVIEW = 7;  // max bookmarks shown per card before "+ N more"
 
     const renderDashboard = () => {
         const grid = $('#dashboard-grid');
         const emptyEl = $('#dashboard-empty');
-        const meta = $('#dashboard-meta');
         grid.replaceChildren();
 
         const cats = dashboardCategories();
+        const totalBms = cats.reduce((sum, c) => sum + bookmarksOf(c.id).length, 0);
+        renderDashboardMeta(cats.length, totalBms);
+
         if (cats.length === 0) {
             emptyEl.classList.remove('hidden');
-            meta.textContent = '';
+            emptyEl.textContent = hiddenEligibleCount() > 0
+                ? 'All categories are hidden. Click "Show hidden" above to reveal them.'
+                : 'No categories with bookmarks yet.';
+            if (gridSortable) { gridSortable.destroy(); gridSortable = null; }
             return;
         }
         emptyEl.classList.add('hidden');
-        const totalBms = cats.reduce((sum, c) => sum + bookmarksOf(c.id).length, 0);
-        meta.textContent = `${cats.length} categor${cats.length === 1 ? 'y' : 'ies'} · ${totalBms} bookmark${totalBms === 1 ? '' : 's'}`;
 
-        for (const cat of cats) {
-            const bms = bookmarksOf(cat.id);
-            const card = document.createElement('article');
-            card.className = 'dash-card';
-            card.dataset.id = cat.id;
+        for (const cat of cats) grid.appendChild(renderDashCard(cat));
 
-            // Header (clickable → list view of that category)
-            const head = document.createElement('header');
-            head.className = 'dash-card-head';
-            const title = document.createElement('h3');
-            title.className = 'dash-card-title';
-            title.textContent = categoryPath(cat.id);
-            const count = document.createElement('span');
-            count.className = 'dash-card-count';
-            count.textContent = String(bms.length);
-            head.appendChild(title);
-            head.appendChild(count);
-            head.addEventListener('click', () => {
-                setView('list');
-                selectCategory(cat.id);
-            });
-            card.appendChild(head);
-
-            // Body: top N bookmarks as a list
-            const list = document.createElement('ul');
-            list.className = 'dash-card-list';
-            const preview = bms.slice(0, DASH_PREVIEW);
-            for (const bm of preview) {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = bm.url;
-                a.target = '_blank';
-                a.rel = 'noopener noreferrer';
-                a.title = bm.title + '\n' + bm.url;
-                const fav = document.createElement('span');
-                fav.className = 'dash-fav';
-                fav.style.background = colorFor(domainFor(bm.url));
-                fav.textContent = initialFor(bm.url);
-                const t = document.createElement('span');
-                t.className = 'dash-bm-title';
-                t.textContent = bm.title;
-                a.appendChild(fav);
-                a.appendChild(t);
-                li.appendChild(a);
-                list.appendChild(li);
-            }
-            card.appendChild(list);
-
-            // Footer: "+ N more" if there are extras
-            if (bms.length > DASH_PREVIEW) {
-                const foot = document.createElement('footer');
-                foot.className = 'dash-card-foot';
-                const more = document.createElement('button');
-                more.className = 'dash-card-more';
-                more.type = 'button';
-                more.textContent = `+ ${bms.length - DASH_PREVIEW} more`;
-                more.addEventListener('click', () => {
-                    setView('list');
-                    selectCategory(cat.id);
-                });
-                foot.appendChild(more);
-                card.appendChild(foot);
-            }
-            grid.appendChild(card);
-        }
+        if (gridSortable) gridSortable.destroy();
+        gridSortable = new Sortable(grid, {
+            animation: 150,
+            handle: '.dash-card-head',
+            draggable: '.dash-card',
+            onEnd: () => {
+                const ids = Array.from(grid.children).map(el => Number(el.dataset.id));
+                persistDashboardOrder(ids);
+            },
+        });
     };
 
-    // Toggle button: cycles list ⇄ dashboard.
+    const renderDashCard = (cat) => {
+        const bms = bookmarksOf(cat.id);
+        const view = currentView();
+        const isHidden = view ? (view.hidden_ids || []).includes(cat.id) : false;
+        const card = document.createElement('article');
+        card.className = 'dash-card' + (isHidden ? ' is-hidden' : '');
+        card.dataset.id = cat.id;
+
+        const head = document.createElement('header');
+        head.className = 'dash-card-head';
+        head.style.background = colorForCard(cat);
+        head.title = 'Drag to reorder · double-click to open · right-click for menu';
+        const title = document.createElement('h3');
+        title.className = 'dash-card-title';
+        title.textContent = categoryPath(cat.id);
+        const count = document.createElement('span');
+        count.className = 'dash-card-count';
+        count.textContent = String(bms.length);
+        head.appendChild(title);
+        head.appendChild(count);
+        head.addEventListener('dblclick', () => {
+            setView('list');
+            selectCategory(cat.id);
+        });
+        head.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const items = [
+                { label: 'Open in list view', action: () => { setView('list'); selectCategory(cat.id); } },
+                { label: '+ Add bookmark',    action: () => { state.selectedCategoryId = cat.id; openBookmarkDialog('add'); } },
+                { label: 'Change color…',     action: () => changeCategoryColor(cat) },
+            ];
+            items.push(
+                isHidden
+                    ? { label: 'Show on dashboard', action: () => setHidden(cat.id, false) }
+                    : { label: 'Hide from dashboard', action: () => setHidden(cat.id, true) },
+                { label: 'Rename category', action: () => renameCategory(cat) },
+                { label: 'Delete category', action: () => deleteCategory(cat) },
+            );
+            showContextMenu(e, items);
+        });
+        card.appendChild(head);
+
+        const list = document.createElement('ul');
+        list.className = 'dash-card-list';
+        list.dataset.catId = cat.id;
+        for (const bm of bms) list.appendChild(renderDashBookmark(bm));
+        card.appendChild(list);
+
+        new Sortable(list, {
+            group: 'dash-bookmarks',
+            animation: 150,
+            draggable: 'li',
+            onEnd: async (evt) => {
+                const targetCatId = Number(evt.to.dataset.catId);
+                const ids = Array.from(evt.to.children).map(li => Number(li.dataset.id));
+                await api('reorder_bookmarks', { category_id: targetCatId, ids });
+                await load();
+            },
+        });
+
+        return card;
+    };
+
+    const renderDashBookmark = (bm) => {
+        const li = document.createElement('li');
+        li.dataset.id = bm.id;
+        const a = document.createElement('a');
+        a.href = bm.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.title = bm.title + '\n' + bm.url;
+        const fav = document.createElement('span');
+        fav.className = 'dash-fav';
+        fav.style.background = colorFor(domainFor(bm.url));
+        fav.textContent = initialFor(bm.url);
+        const t = document.createElement('span');
+        t.className = 'dash-bm-title';
+        t.textContent = bm.title;
+        a.appendChild(fav);
+        a.appendChild(t);
+        li.appendChild(a);
+        li.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showContextMenu(e, [
+                { label: 'Open in new tab', action: () => window.open(bm.url, '_blank', 'noopener') },
+                { label: 'Edit',            action: () => editBookmark(bm) },
+                { label: 'Delete',          action: () => deleteBookmark(bm) },
+            ]);
+        });
+        return li;
+    };
+
     $('#view-toggle').addEventListener('click', () => {
         setView(state.viewMode === 'dashboard' ? 'list' : 'dashboard');
+    });
+
+    /* ---------- Context menu ---------- */
+    const buildContextMenu = (items) => {
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.id = 'context-menu';
+        for (const it of items) {
+            if (it.separator) {
+                const sep = document.createElement('div');
+                sep.className = 'context-menu-separator';
+                menu.appendChild(sep);
+                continue;
+            }
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'context-menu-item';
+            btn.textContent = it.label;
+            btn.addEventListener('click', () => { closeContextMenu(); it.action(); });
+            menu.appendChild(btn);
+        }
+        return menu;
+    };
+    const placeMenu = (menu, x, y) => {
+        menu.style.left = '-9999px';
+        menu.style.top = '0';
+        document.body.appendChild(menu);
+        const rect = menu.getBoundingClientRect();
+        const cx = Math.min(x, window.innerWidth - rect.width - 4);
+        const cy = Math.min(y, window.innerHeight - rect.height - 4);
+        menu.style.left = Math.max(4, cx) + 'px';
+        menu.style.top  = Math.max(4, cy) + 'px';
+    };
+    const showContextMenu = (event, items) => {
+        closeContextMenu();
+        const menu = buildContextMenu(items);
+        placeMenu(menu, event.clientX, event.clientY);
+    };
+    const showContextMenuAt = (x, y, items) => {
+        closeContextMenu();
+        const menu = buildContextMenu(items);
+        placeMenu(menu, x, y);
+    };
+    const closeContextMenu = () => {
+        const m = document.getElementById('context-menu');
+        if (m) m.remove();
+    };
+    document.addEventListener('click', closeContextMenu);
+    document.addEventListener('scroll', closeContextMenu, true);
+    window.addEventListener('blur', closeContextMenu);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu(); });
+
+    /* ---------- View switcher (named views) ---------- */
+    const renderViewPicker = () => {
+        const btn = $('#view-picker');
+        const view = currentView();
+        btn.textContent = 'View: ' + (view?.name ?? '—') + ' ▾';
+    };
+
+    const openViewMenu = (anchorEl) => {
+        closeContextMenu();
+        const view = currentView();
+        const items = [];
+        for (const v of state.views) {
+            const isCurrent = v.id === state.currentViewId;
+            items.push({
+                label: (isCurrent ? '✓  ' : '    ') + v.name,
+                action: () => switchToView(v.id),
+            });
+        }
+        items.push({ separator: true });
+        items.push({ label: '+ New view (clones current)', action: createNewView });
+        if (view) items.push({ label: 'Rename current view',     action: () => renameCurrentView(view) });
+        if (state.views.length > 1 && view) {
+            items.push({ label: 'Delete current view', action: () => deleteCurrentView(view) });
+        }
+
+        // Position below the anchor button.
+        const rect = anchorEl.getBoundingClientRect();
+        showContextMenuAt(rect.left, rect.bottom + 4, items);
+    };
+
+    const switchToView = async (id) => {
+        if (id === state.currentViewId) {
+            if (state.viewMode !== 'dashboard') setView('dashboard');
+            return;
+        }
+        state.currentViewId = id;
+        try { await api('set_current_view', { id }); }
+        catch (err) { console.error('set_current_view:', err); }
+        renderViewPicker();
+        if (state.viewMode !== 'dashboard') setView('dashboard');
+        else renderDashboard();
+    };
+
+    const createNewView = async () => {
+        const name = prompt('Name for the new view (clones the current view):');
+        if (!name || !name.trim()) return;
+        const view = currentView();
+        const body = { name: name.trim() };
+        if (view) body.clone_from_id = view.id;
+        const res = await api('add_view', body);
+        if (res?.view) {
+            state.views.push(res.view);
+            state.currentViewId = res.current_view_id;
+        }
+        renderViewPicker();
+        if (state.viewMode !== 'dashboard') setView('dashboard');
+        else renderDashboard();
+    };
+
+    const renameCurrentView = async (view) => {
+        const name = prompt('Rename view:', view.name);
+        if (!name || !name.trim() || name === view.name) return;
+        view.name = name.trim();
+        await api('rename_view', { id: view.id, name: view.name });
+        renderViewPicker();
+    };
+
+    const deleteCurrentView = async (view) => {
+        if (!confirm(`Delete view "${view.name}"? Categories themselves stay; only this view's order/hidden choices are removed.`)) return;
+        const res = await api('delete_view', { id: view.id });
+        state.views = state.views.filter(v => v.id !== view.id);
+        state.currentViewId = res.current_view_id ?? state.views[0]?.id ?? null;
+        renderViewPicker();
+        if (state.viewMode === 'dashboard') renderDashboard();
+    };
+
+    $('#view-picker').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openViewMenu(e.currentTarget);
     });
 
     /* ---------- Boot ---------- */

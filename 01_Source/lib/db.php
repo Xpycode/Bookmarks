@@ -12,7 +12,19 @@ function db(): PDO {
     $pdo->exec('PRAGMA foreign_keys = ON');
     $pdo->exec('PRAGMA journal_mode = WAL');
     if ($isNew) initSchema($pdo);
+    migrate($pdo);
     return $pdo;
+}
+
+// Idempotent column adds. SQLite has no `IF NOT EXISTS` for ADD COLUMN;
+// a duplicate-column error is swallowed so this is safe to run every request.
+function migrate(PDO $pdo): void {
+    $statements = [
+        'ALTER TABLE categories ADD COLUMN color TEXT',
+    ];
+    foreach ($statements as $sql) {
+        try { $pdo->query($sql); } catch (PDOException $e) { /* column already exists */ }
+    }
 }
 
 function initSchema(PDO $pdo): void {

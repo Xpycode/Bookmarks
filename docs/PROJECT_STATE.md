@@ -13,10 +13,10 @@
 
 ## Current Position
 - **Funnel:** build
-- **Phase:** v2 wave 1 shipped, picking wave 2
-- **Focus:** Verify wave 1 in browser (dashboard, bookmarklet, Cancel-button fix), then pick wave 2 from the v2 backlog. Recommended trio: tags → auto-fetch metadata → FTS5.
+- **Phase:** v2 wave 2 shipped (dashboard rebuild — drag, colors, hide, named views), fine-tuning next.
+- **Focus:** User-driven fine-tuning of the live dashboard. Then pick wave 3 from backlog (recommended trio still tags → auto-fetch metadata → FTS5).
 - **Status:** ready
-- **Last updated:** 2026-05-06
+- **Last updated:** 2026-05-08
 
 ## Funnel Progress
 
@@ -24,9 +24,9 @@
 |--------|--------|------|
 | **Define** | done | Stack + scope locked. Hard constraint: PHP+SQLite, no Composer/Node, Strato-FastCGI deployable. |
 | **Plan** | done | 25-manager landscape research → Top-10 backlog. |
-| **Build** | active | v1 live with 609 imported bookmarks. v2 wave 1 deployed `d637d64`. |
+| **Build** | active | v1 live with 609 imported bookmarks. v2 wave 2 dashboard live (uncommitted on main). |
 
-## Shipped (v1 + v2 wave 1)
+## Shipped (v1 + v2 waves 1–2)
 
 | Capability | Where |
 |------------|-------|
@@ -37,9 +37,16 @@
 | Netscape HTML import — verified against real Bookmarkninja export | v1 |
 | Single-user auth (bcrypt + CSRF + HttpOnly session) | v1 |
 | Strato deploy (`./03_Scripts/deploy.sh` — lftp + stage-then-mirror) | v1 |
-| **Dashboard view** (CSS-Grid card layout, all categories at once) | v2 wave 1 |
-| **Bookmarklet** (popup-with-mini-form pattern: `?r=quickadd`) | v2 wave 1 |
-| **Cancel-button bug fix** (Add-bookmark dialog) | v2 wave 1 |
+| Dashboard view (CSS-Grid card layout) | v2 wave 1 |
+| Bookmarklet (`?r=quickadd` popup) | v2 wave 1 |
+| Cancel-button fix (Add-bookmark dialog) | v2 wave 1 |
+| **Dashboard rebuild — full-width, sidebar hidden, drag cards by header** | v2 wave 2 |
+| **Drag bookmarks within and between cards** (Sortable shared group) | v2 wave 2 |
+| **Right-click context menus** (bookmarks + card headers) | v2 wave 2 |
+| **Per-category colors** (`<dialog>` color picker, `categories.color` column) | v2 wave 2 |
+| **Hide categories per-view** (`hidden_ids` in `settings.views_data`) | v2 wave 2 |
+| **Named views** (clone/rename/delete; `View: All ▾` dropdown in topbar) | v2 wave 2 |
+| **Internal-scroll cards** (no `+ N more` cap; `max-height: 360px` per card body) | v2 wave 2 |
 
 ## v2 Backlog (remaining, prioritized)
 
@@ -71,24 +78,24 @@ Deferred (HARD or scope-creep): AI auto-tag/auto-summary, semantic-search embedd
 04_Exports/            user's real Bookmarkninja export (gitignored — personal)
 ```
 
-Schema unchanged from v1: `settings(key,value)`, `categories(id,name,parent_id,sort_order)`, `bookmarks(id,category_id,title,url,notes,sort_order,created_at)`.
+Schema (v2 wave 2): `settings(key,value)`, `categories(id,name,parent_id,sort_order, color)`, `bookmarks(id,category_id,title,url,notes,sort_order,created_at)`. Per-view dashboard order + hidden set live in `settings.views_data` as JSON.
 
 ## Active Decisions
 <!-- Last 5. Full history in decisions.md. -->
+- 2026-05-08: **Dashboard mode hides the sidebar.** Cards are the primary nav now; tree is for list-view only. `body.dashboard-mode` class drives both sidebar visibility and the layout grid template.
+- 2026-05-08: **Card colors live on the categories table; hidden-set lives in settings (per-view).** Property-of-category vs property-of-view distinction. Avoids schema rework when phase-3 added named views.
+- 2026-05-08: **Named views stored as a single JSON in `settings.views_data`** (`{ views: [...], current_view_id }`). No `views` table — promote later if views grow more fields.
 - 2026-05-06: **Numbered-folder layout** adopted (`01_Source/`, `03_Scripts/`, etc.) to match LUCESUMBRARUM/LEARNING/KinoBerlin. Reverses the earlier root-level decision.
-- 2026-05-06: **Never add `SetHandler application/x-httpd-php` on Strato.** Strato uses PHP-FastCGI; that mod_php directive breaks execution. Verified across three working PHP sites with zero handler directives.
-- 2026-05-06: **Dashboard pattern: uniform card grid, NOT bento.** 20 same-class categories want consistent tiles, not asymmetric hero/spec layout. CSS Grid `repeat(auto-fill, minmax(320px, 1fr))` for natural responsive flow.
-- 2026-05-06: **Bookmarklet pattern: popup-with-mini-form (the standard).** Self-contained `views/quickadd.php` handles its own auth so URL/title query params survive the login redirect. Reuses existing `add_bookmark` API.
-- 2026-05-06: **Imported the real 609-bookmark Bookmarkninja export.** Parser preserves folder hierarchy + notes; silently drops `TAGS=` and `ADD_DATE=` attributes (planned re-import once tags land in schema).
+- 2026-05-06: **Never add `SetHandler application/x-httpd-php` on Strato.** Strato uses PHP-FastCGI; that mod_php directive breaks execution.
 
 ## Blockers
 None.
 
 ## Open Questions for Next Session
-- Verify wave 1 in the browser (especially: bookmarklet drag in Safari, dashboard with the 17 leaf categories, dashboard refresh after sidebar actions).
-- Pick wave 2 scope. Recommended: **tags first**, then re-import the export to backfill tags from the original `TAGS=` attribute. Auto-fetch metadata can come right after to give cards real favicons.
-- Decide: keep `+ N more` cards at natural height (current), or normalize to `min-height: 280px` so footer rows align across columns?
-- Silence `x-powered-by: PHP/8.4.20` header? (one-liner `header_remove("X-Powered-By");` in index.php.)
+- User-driven fine-tuning of the dashboard. Topics not yet picked.
+- Add cache-busting `app.js?v=<mtime>` to `views/app.php`? (Edge-vs-Safari mismatch this session was 100% browser cache.)
+- Strip `x-powered-by: PHP/8.4.20` (one-liner `header_remove("X-Powered-By");` in `index.php`).
+- Wave 3 scope. Recommended: tags → auto-fetch metadata → FTS5. None touched yet.
 
 ---
 *Source of truth for project position. Keep under 100 lines.*

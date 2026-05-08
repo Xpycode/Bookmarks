@@ -70,4 +70,52 @@ The WHY behind technical and design choices. Append new decisions; do not rewrit
 
 ---
 
+## 2026-05-08 — Dashboard mode hides the sidebar
+
+**Context:** Wave-1 dashboard kept the sidebar visible alongside the card grid. With 3 children (sidebar + content + dashboard) in a 2-column CSS grid, the dashboard auto-flowed to row 2 col 1, producing an empty `All categories` strip below the sidebar. Beyond fixing that layout bug, the user wanted Bookmarkninja-style "everything in view" cards.
+
+**Decision:** In dashboard mode, hide the sidebar entirely. `body.dashboard-mode` class drives both `.sidebar { display: none }` and `.layout { grid-template-columns: 1fr }`.
+
+**Rationale:** Cards are now the primary nav. The tree only matters for list-view drill-down. Trying to render both at once gives neither enough room. Toggling via a single body class keeps the JS-CSS contract simple (one class, all dependent rules in CSS).
+
+**Consequences:** Switching to a deeply-nested category for editing now takes one extra click (Dashboard → list view via right-click "Open in list view" or the toggle). Acceptable tradeoff for the dashboard's full-width view.
+
+---
+
+## 2026-05-08 — Card colors live on the row; hidden-set lives per-view
+
+**Context:** Phase 2 added per-category colors and per-category hide. Phase 3 (named views) needed a place to put per-view hidden-state.
+
+**Decision:** Color is a property of the *category* — stored as `categories.color TEXT` (nullable), persists across views. Hidden-state is a property of the *view* — stored as a JSON id-array in `settings.views_data.views[i].hidden_ids`.
+
+**Rationale:** "MCR is red" is a permanent visual identity for that category — it should be red no matter which view you're looking from. "MCR is hidden" is contextual — it's hidden in the Work view but visible in All. Putting hidden in `settings` (rather than on `categories`) made phase 3's per-view extension a straight JSON change with zero schema work.
+
+**Consequences:** Per-view colors are not possible (and explicitly rejected — would be confusing). Color always reflects the global category state.
+
+---
+
+## 2026-05-08 — Named views stored as a single JSON in `settings.views_data`
+
+**Context:** Phase 3 introduced multiple "views" — each with its own dashboard order and hidden set. Could've been a `views` table + a `view_categories` join, or a single JSON blob in `settings`.
+
+**Decision:** Single JSON blob in `settings`, key `views_data`: `{ views: [{ id, name, dashboard_order, hidden_ids }, ...], current_view_id }`. New `ensureViewsData()` PHP helper migrates legacy `dashboard_order` + `hidden_ids` keys into a default "All" view on first call.
+
+**Rationale:** Zero schema migration on a codebase whose `db.php` only runs `initSchema` for new DBs. Single atomic write per view operation. Data is small (<10kB even with dozens of views). Strictly simpler than a real table while the schema needs are this thin.
+
+**Consequences:** Promote to a real `views` table when views grow more fields (descriptions, tag filters, sharing slugs). Until then, all view actions (`add_view`, `rename_view`, `delete_view`, `set_current_view`, `set_view_order`, `set_view_hidden`) read-modify-write the single key.
+
+---
+
+## 2026-05-08 — Native `<dialog>` color picker, not the OS picker
+
+**Context:** First attempt at Change-color was a programmatic `.click()` on an offscreen `<input type="color">`. Worked in Chrome; Safari silently blocked it (anti-spoofing — refuses to open native pickers for off-screen inputs).
+
+**Decision:** Use a real visible `<dialog>` containing the color input + Save / Reset to auto / Cancel buttons. No programmatic native-picker triggers.
+
+**Rationale:** Cross-browser portable. Matches existing `#bookmark-dialog` and `#import-dialog` patterns. Reset-to-auto is now a peer button instead of a separate context-menu item.
+
+**Consequences:** Slightly more clicks per color change (open dialog, pick, save) vs Chrome-style direct picker. Fine for a single-user tool used a few times per category.
+
+---
+
 *Append new decisions below. Keep oldest at top.*

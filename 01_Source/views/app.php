@@ -22,6 +22,7 @@ $importedBms = (int)($_GET['b'] ?? 0);
         <input id="search" type="search" placeholder="Search bookmarks…" autocomplete="off">
     </div>
     <div class="topbar-right">
+        <button id="view-picker" class="ghost" type="button" title="Switch dashboard view">View: All ▾</button>
         <button id="view-toggle" class="ghost" type="button" title="Toggle dashboard / list view">▦ Dashboard</button>
         <button id="import-btn" class="ghost" type="button" title="Import / bookmarklet">Import</button>
         <button id="theme-toggle" class="ghost" type="button" title="Toggle dark mode">🌓</button>
@@ -79,6 +80,21 @@ $importedBms = (int)($_GET['b'] ?? 0);
         <menu>
             <button value="cancel" class="ghost" formnovalidate>Cancel</button>
             <button value="ok" class="primary" id="bookmark-save">Save</button>
+        </menu>
+    </form>
+</dialog>
+
+<dialog id="color-dialog">
+    <form method="dialog" id="color-form">
+        <h3>Change category color</h3>
+        <p id="color-dialog-target" class="dialog-hint"></p>
+        <label>Pick a color
+            <input type="color" id="color-input" value="#5b6b7c">
+        </label>
+        <menu>
+            <button type="button" value="reset" class="ghost" id="color-reset">Reset to auto</button>
+            <button type="button" value="cancel" class="ghost" data-close>Cancel</button>
+            <button value="ok" class="primary" id="color-save">Save</button>
         </menu>
     </form>
 </dialog>
