@@ -56,7 +56,7 @@ The reference product (Bookmarkninja) succeeds on **visual recall** — a dashbo
 
 ## Working Conventions
 
-- **Branch:** `claude/bookmark-manager-import-juSnx` is the working branch the project was imported on. Branch off `feature/<name>` for new work; never commit directly to `main`.
+- **Git:** local-only repo (no remote). Working branch is `main`. Commit when changes form a logical wave (one commit per shipped wave is the established pattern — see `git log --oneline`).
 - **PHP style:** `declare(strict_types=1);` at the top of every file. PDO prepared statements only — never string-concat SQL. CSRF check via `hash_equals` for every mutating endpoint.
 - **Frontend style:** Plain DOM API. No framework. Match the existing event-handler patterns in `public/app.js`.
 - **Schema changes:** edit `lib/db.php` and add an `ALTER TABLE` in the bootstrap block (idempotent — wrap in try/catch or `IF NOT EXISTS`). There's no migration tool; the bootstrap runs every request.

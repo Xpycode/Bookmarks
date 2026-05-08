@@ -7,9 +7,9 @@
 - **One-liner:** Self-hosted single-user bookmark manager for Strato shared hosting — PHP 8 + SQLite, vanilla JS, zero build step.
 - **Tags:** web, php, sqlite, self-hosted, bookmark-manager, strato
 - **Started:** 2026-05-05
-- **Repo:** github.com/Xpycode/Bookmarks
+- **Repo:** local-only git (no remote). Deploys to live via `./03_Scripts/deploy.sh` (lftp → Strato).
 - **Live URL:** https://bookmarks.lucesumbrarum.com (PHP 8.4.20, Apache/Strato)
-- **Working branch:** `main` (also kept in sync with `claude/bookmark-manager-import-juSnx`)
+- **Working branch:** `main`
 
 ## Current Position
 - **Funnel:** build
