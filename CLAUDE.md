@@ -56,7 +56,7 @@ The reference product (Bookmarkninja) succeeds on **visual recall** — a dashbo
 
 ## Working Conventions
 
-- **Git:** local-only repo (no remote). Working branch is `main`. Commit when changes form a logical wave (one commit per shipped wave is the established pattern — see `git log --oneline`).
+- **Git:** Remote at `github.com/Xpycode/Bookmarks` (also carries the `claude/bookmark-manager-import-juSnx` import branch). Working on `main`. Commit when changes form a logical wave — one commit per shipped wave is the established pattern (see `git log --oneline`). Push to remote when convenient; deploys go through `./03_Scripts/deploy.sh` (lftp → Strato), independent of git push.
 - **PHP style:** `declare(strict_types=1);` at the top of every file. PDO prepared statements only — never string-concat SQL. CSRF check via `hash_equals` for every mutating endpoint.
 - **Frontend style:** Plain DOM API. No framework. Match the existing event-handler patterns in `public/app.js`.
 - **Schema changes:** edit `lib/db.php` and add an `ALTER TABLE` in the bootstrap block (idempotent — wrap in try/catch or `IF NOT EXISTS`). There's no migration tool; the bootstrap runs every request.
