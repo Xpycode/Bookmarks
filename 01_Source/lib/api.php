@@ -187,6 +187,27 @@ function apiHandle(string $action): void {
             saveViewsData($vd);
             jsonOut(['ok' => true]);
         }
+        case 'set_view_columns': {
+            // Per-column dashboard layout: array of arrays of category IDs.
+            // Used by the masonry dashboard to preserve drop position across
+            // reloads. The flat dashboard_order is also kept (set separately
+            // via set_view_order) so a column-count change can fall back to
+            // greedy packing.
+            $vid = (int)($in['view_id'] ?? 0);
+            $cols = $in['columns'] ?? null;
+            if (!$vid || !is_array($cols)) jsonOut(['error' => 'bad input'], 400);
+            $clean = [];
+            foreach ($cols as $col) {
+                if (!is_array($col)) jsonOut(['error' => 'bad input: columns must be array of arrays'], 400);
+                $clean[] = array_values(array_map('intval', $col));
+            }
+            $vd = ensureViewsData($pdo);
+            $i = findViewIndex($vd, $vid);
+            if ($i < 0) jsonOut(['error' => 'view not found'], 404);
+            $vd['views'][$i]['dashboard_columns'] = $clean;
+            saveViewsData($vd);
+            jsonOut(['ok' => true]);
+        }
         case 'add_view': {
             $name = trim((string)($in['name'] ?? ''));
             $cloneFrom = isset($in['clone_from_id']) ? (int)$in['clone_from_id'] : 0;

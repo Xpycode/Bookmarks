@@ -361,11 +361,21 @@ body.dashboard-mode .layout { grid-template-columns: 1fr; }
 }
 .dash-show-hidden:hover { background: var(--surface-2); border-color: var(--accent); color: var(--accent); }
 
+/* Masonry: flex container holds N .dash-col children; each column packs cards
+   independently so short cards don't leave row-bound voids beneath them.
+   Column count + per-column packing are computed in JS (layoutDashboard). */
 .dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    display: flex;
     gap: 16px;
-    align-items: start;
+    align-items: flex-start;
+}
+.dash-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 400px;
 }
 .dashboard-empty { color: var(--text-muted); padding: 60px 20px; text-align: center; }
 .dashboard-empty.hidden { display: none; }
@@ -412,12 +422,15 @@ body.dashboard-mode .layout { grid-template-columns: 1fr; }
     text-align: center;
 }
 
-/* Card body scrolls internally so a 200-bookmark category doesn't blow out the page. */
+/* Card body scrolls internally only for truly huge categories (Privat/divers,
+   Catalog). With masonry, each column packs independently, so most cards can
+   now show all their bookmarks without forcing voids elsewhere. 70vh adapts
+   to the user's screen height. */
 .dash-card-list {
     list-style: none;
     padding: 6px 0;
     margin: 0;
-    max-height: 360px;
+    max-height: 70vh;
     overflow-y: auto;
     min-height: 16px; /* keep an empty card a valid drop target */
 }

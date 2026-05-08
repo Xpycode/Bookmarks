@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/auth.php';
+require __DIR__ . '/lib/assets.php';
 
 $route = $_GET['r'] ?? '';
 
@@ -38,6 +39,14 @@ if (!isSetup()) {
 // which would lose the bookmarklet's payload.
 if ($route === 'quickadd') {
     include __DIR__ . '/views/quickadd.php';
+    exit;
+}
+
+// Share-target route — same pattern as quickadd, but receives a POST from
+// the OS share sheet with multipart/form-data {title,text,url}. Auth handled
+// inline so the share payload survives the login round-trip.
+if ($route === 'share') {
+    include __DIR__ . '/views/share.php';
     exit;
 }
 

@@ -4,8 +4,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Set up your bookmark manager</title>
-<link rel="stylesheet" href="public/app.css">
+<link rel="stylesheet" href="<?= asset('app.css') ?>">
 </head>
 <body class="auth-page">
 <form class="auth-card" method="post" action="index.php?r=setup" autocomplete="off">

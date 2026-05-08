@@ -10,8 +10,10 @@ $importedBms = (int)($_GET['b'] ?? 0);
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf-token" content="<?= htmlspecialchars($csrf) ?>">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Bookmarks</title>
-<link rel="stylesheet" href="public/app.css">
+<link rel="stylesheet" href="<?= asset('app.css') ?>">
 </head>
 <body>
 <header class="topbar">
@@ -24,7 +26,8 @@ $importedBms = (int)($_GET['b'] ?? 0);
     <div class="topbar-right">
         <button id="view-picker" class="ghost" type="button" title="Switch dashboard view">View: All ▾</button>
         <button id="view-toggle" class="ghost" type="button" title="Toggle dashboard / list view">▦ Dashboard</button>
-        <button id="import-btn" class="ghost" type="button" title="Import / bookmarklet">Import</button>
+        <button id="bookmarklet-btn" class="ghost" type="button" title="Save-current-page tools (bookmarklet, share target)">↗ Save tools</button>
+        <button id="import-btn" class="ghost" type="button" title="Import a bookmarks file">Import</button>
         <button id="theme-toggle" class="ghost" type="button" title="Toggle dark mode">🌓</button>
         <a class="ghost" href="index.php?r=logout">Sign out</a>
     </div>
@@ -111,26 +114,28 @@ $importedBms = (int)($_GET['b'] ?? 0);
             <button type="submit" class="primary">Import</button>
         </menu>
     </form>
+</dialog>
 
-    <hr class="dialog-sep">
-
-    <h3>Quick-add bookmarklet</h3>
+<dialog id="bookmarklet-dialog">
+    <h3>Save current page</h3>
     <p>Drag the link below to your browser's bookmarks bar. Clicking it on any page opens a small popup that saves that page here.</p>
     <p>
     <?php
-    $scheme = (
-        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-        (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
-    ) ? 'https' : 'http';
-    $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    // Hardcode the canonical origin so the bookmarklet can never inherit a weird HTTP_HOST
+    // (www-prefix, IP, dev domain). Update if the production hostname ever changes.
+    $origin = 'https://bookmarks.lucesumbrarum.com';
     $bookmarklet = "javascript:(function(){var u=encodeURIComponent(location.href);var t=encodeURIComponent(document.title);window.open('" . $origin . "/?r=quickadd&url='+u+'&title='+t,'BookmarkAdd','width=520,height=640');})();";
     ?>
         <a class="bookmarklet-link" href="<?= htmlspecialchars($bookmarklet) ?>" draggable="true" onclick="event.preventDefault();return false;">+ Bookmarks</a>
     </p>
     <p class="dialog-hint">Tip: if your bookmarks bar is hidden, show it first (⌘⇧B in Safari/Chrome).</p>
+    <p class="dialog-hint">Coming soon: install as a PWA to save pages directly from your phone's share sheet.</p>
+    <menu>
+        <button type="button" class="primary" data-close>Done</button>
+    </menu>
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script src="public/app.js"></script>
+<script src="<?= asset('app.js') ?>"></script>
 </body>
 </html>

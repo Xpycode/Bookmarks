@@ -28,6 +28,18 @@
         return res.json();
     };
 
+    /* ---------- PWA service worker ---------- */
+    // Register on load (not blocking initial render). Failure is non-fatal —
+    // app works fine without the SW; install prompt and share-target just
+    // become unavailable.
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => {
+                console.warn('SW registration failed:', err);
+            });
+        });
+    }
+
     /* ---------- Theme ---------- */
     const applyTheme = () => {
         const t = localStorage.getItem('theme');
@@ -403,6 +415,10 @@
     $('#import-btn').addEventListener('click', () => importDialog.showModal());
     importDialog.querySelector('[data-close]').addEventListener('click', () => importDialog.close());
 
+    const bookmarkletDialog = $('#bookmarklet-dialog');
+    $('#bookmarklet-btn').addEventListener('click', () => bookmarkletDialog.showModal());
+    bookmarkletDialog.querySelector('[data-close]').addEventListener('click', () => bookmarkletDialog.close());
+
     /* ---------- Search ---------- */
     const searchInput = $('#search');
     const searchResults = $('#search-results');
@@ -474,7 +490,14 @@
     state.views = [];
     state.currentViewId = null;
     state.showHidden = localStorage.getItem('showHidden') === '1';
-    let gridSortable = null;
+    state.dashboardDragging = false;
+
+    // Masonry layout constants. COL_MIN matches the previous grid's minmax(320px).
+    // COL_MAX (400px) is enforced via .dash-col CSS so single-card views don't
+    // span the whole viewport.
+    const COL_MIN = 320;
+    const GAP = 16;
+    let colSortables = [];
 
     const currentView = () => state.views.find(v => v.id === state.currentViewId) || state.views[0] || null;
 
@@ -601,10 +624,137 @@
         }
     };
 
+    // After a drag, columns may contain cards in any order. Flatten to a single
+    // flat ID list in zigzag (reading) order: col0[0], col1[0], …, colN[0],
+    // col0[1], col1[1], …  This is the fallback flat order used when the saved
+    // per-column layout can't be used (column count changed, e.g. via resize).
+    const zigzagFlatten = (grid) => {
+        const cols = Array.from(grid.children);
+        const colCards = cols.map(col => Array.from(col.children));
+        const maxRows = colCards.length ? Math.max(...colCards.map(a => a.length)) : 0;
+        const ids = [];
+        for (let row = 0; row < maxRows; row++) {
+            for (const cards of colCards) {
+                const card = cards[row];
+                if (card) ids.push(Number(card.dataset.id));
+            }
+        }
+        return ids;
+    };
+
+    // Read current column membership from DOM, save as view.dashboard_columns
+    // and persist to server. This is the source of truth for "where the user
+    // dropped each card." Greedy is only used as a fallback when there's no
+    // saved layout or the column count doesn't match the viewport.
+    const saveDashboardColumns = () => {
+        const view = currentView();
+        if (!view) return;
+        const grid = $('#dashboard-grid');
+        const columns = Array.from(grid.children).map(col =>
+            Array.from(col.children).map(c => Number(c.dataset.id))
+        );
+        view.dashboard_columns = columns;
+        api('set_view_columns', { view_id: view.id, columns })
+            .catch(err => console.error('save columns:', err));
+    };
+
+    // Build the column DOM. Prefer view.dashboard_columns (the layout the user
+    // actually arranged via drag); fall back to greedy shortest-column packing
+    // when there's no saved layout, when the column count has changed (resize),
+    // or when new categories exist that aren't in the saved layout yet.
+    const layoutDashboard = (cards) => {
+        const grid = $('#dashboard-grid');
+        if (!cards) cards = Array.from(grid.querySelectorAll('.dash-card'));
+
+        for (const s of colSortables) s.destroy();
+        colSortables = [];
+        for (const card of cards) card.remove();
+
+        if (cards.length === 0) {
+            grid.replaceChildren();
+            return;
+        }
+
+        const containerW = grid.clientWidth;
+        const colCount = Math.max(1, Math.floor((containerW + GAP) / (COL_MIN + GAP)));
+
+        const cols = [];
+        for (let i = 0; i < colCount; i++) {
+            const col = document.createElement('div');
+            col.className = 'dash-col';
+            cols.push(col);
+        }
+        grid.replaceChildren(...cols);
+
+        // Decide: saved-layout fast path, or greedy fallback?
+        const view = currentView();
+        const saved = view && Array.isArray(view.dashboard_columns)
+            && view.dashboard_columns.length === colCount
+            ? view.dashboard_columns
+            : null;
+
+        const cardById = new Map(cards.map(c => [Number(c.dataset.id), c]));
+        const placed = new Set();
+
+        if (saved) {
+            // Place each card in the column it was saved in. Stale ids (deleted
+            // or hidden cats) are silently skipped via the cardById lookup.
+            saved.forEach((idsInCol, colIdx) => {
+                for (const id of idsInCol) {
+                    const card = cardById.get(id);
+                    if (card && !placed.has(id)) {
+                        cols[colIdx].appendChild(card);
+                        placed.add(id);
+                    }
+                }
+            });
+        }
+
+        // Cards not in saved layout (new categories, or no saved layout at all)
+        // → greedy place into shortest column. Reading offsetHeight forces a
+        // layout flush so each iteration sees live column heights.
+        let extendedSaved = false;
+        for (const card of cards) {
+            const id = Number(card.dataset.id);
+            if (placed.has(id)) continue;
+            let shortest = 0;
+            for (let j = 1; j < colCount; j++) {
+                if (cols[j].offsetHeight < cols[shortest].offsetHeight) shortest = j;
+            }
+            cols[shortest].appendChild(card);
+            extendedSaved = true;
+        }
+
+        // Persist fresh layout when we did greedy work (no saved, mismatched
+        // column count, or new cards appended). Skip when saved was sufficient.
+        if (!saved || extendedSaved) {
+            saveDashboardColumns();
+        }
+
+        // Per-column Sortables sharing one group → cross-column drag works.
+        // No post-drop repack: cards stay exactly where Sortable dropped them.
+        for (const col of cols) {
+            const s = new Sortable(col, {
+                group: 'dashboard-cards',
+                animation: 150,
+                handle: '.dash-card-head',
+                draggable: '.dash-card',
+                onStart: () => { state.dashboardDragging = true; },
+                onEnd: () => {
+                    state.dashboardDragging = false;
+                    saveDashboardColumns();
+                    // Keep flat dashboard_order in sync so a later resize that
+                    // changes column count has a sensible seed for greedy.
+                    persistDashboardOrder(zigzagFlatten(grid));
+                },
+            });
+            colSortables.push(s);
+        }
+    };
+
     const renderDashboard = () => {
         const grid = $('#dashboard-grid');
         const emptyEl = $('#dashboard-empty');
-        grid.replaceChildren();
 
         const cats = dashboardCategories();
         const totalBms = cats.reduce((sum, c) => sum + bookmarksOf(c.id).length, 0);
@@ -615,24 +765,28 @@
             emptyEl.textContent = hiddenEligibleCount() > 0
                 ? 'All categories are hidden. Click "Show hidden" above to reveal them.'
                 : 'No categories with bookmarks yet.';
-            if (gridSortable) { gridSortable.destroy(); gridSortable = null; }
+            for (const s of colSortables) s.destroy();
+            colSortables = [];
+            grid.replaceChildren();
             return;
         }
         emptyEl.classList.add('hidden');
 
-        for (const cat of cats) grid.appendChild(renderDashCard(cat));
-
-        if (gridSortable) gridSortable.destroy();
-        gridSortable = new Sortable(grid, {
-            animation: 150,
-            handle: '.dash-card-head',
-            draggable: '.dash-card',
-            onEnd: () => {
-                const ids = Array.from(grid.children).map(el => Number(el.dataset.id));
-                persistDashboardOrder(ids);
-            },
-        });
+        const cards = cats.map(cat => renderDashCard(cat));
+        layoutDashboard(cards);
     };
+
+    // Resize → re-pack (column count may change). Skip mid-drag to avoid
+    // re-layout racing with Sortable's own DOM manipulation.
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (state.dashboardDragging) return;
+            if (state.viewMode !== 'dashboard') return;
+            layoutDashboard();
+        }, 150);
+    });
 
     const renderDashCard = (cat) => {
         const bms = bookmarksOf(cat.id);

@@ -13,8 +13,8 @@
 
 ## Current Position
 - **Funnel:** build
-- **Phase:** v2 wave 2 shipped (dashboard rebuild — drag, colors, hide, named views), fine-tuning next.
-- **Focus:** User-driven fine-tuning of the live dashboard. Then pick wave 3 from backlog (recommended trio still tags → auto-fetch metadata → FTS5).
+- **Phase:** v2 wave 3b shipped (PWA + Web Share Target, bookmarklet surfaced in topbar, asset cache-bust). Save-current-tab UX now covers desktop bookmarklet + mobile/CSP-safe share sheet.
+- **Focus:** Wave 4 picks. Recommended next: **tags alongside categories** (data already in import; biggest UX win). Or wave 5: **auto-fetch metadata** (favicons + descriptions on save).
 - **Status:** ready
 - **Last updated:** 2026-05-08
 
@@ -24,29 +24,18 @@
 |--------|--------|------|
 | **Define** | done | Stack + scope locked. Hard constraint: PHP+SQLite, no Composer/Node, Strato-FastCGI deployable. |
 | **Plan** | done | 25-manager landscape research → Top-10 backlog. |
-| **Build** | active | v1 live with 609 imported bookmarks. v2 wave 2 dashboard live (uncommitted on main). |
+| **Build** | active | v1 live with 609 imported bookmarks. v2 waves 2 + 3a dashboard + 3b save-tab UX all live. |
 
-## Shipped (v1 + v2 waves 1–2)
+## Shipped (v1 + v2 waves 1–3a)
 
 | Capability | Where |
 |------------|-------|
-| Nested categories with drag-to-reparent | v1 |
-| Bookmarks: add / edit / delete / reorder / move | v1 |
-| Search across title/url/notes (LIKE, debounced) | v1 |
-| Dark mode (system-pref default + manual toggle) | v1 |
-| Netscape HTML import — verified against real Bookmarkninja export | v1 |
-| Single-user auth (bcrypt + CSRF + HttpOnly session) | v1 |
-| Strato deploy (`./03_Scripts/deploy.sh` — lftp + stage-then-mirror) | v1 |
-| Dashboard view (CSS-Grid card layout) | v2 wave 1 |
-| Bookmarklet (`?r=quickadd` popup) | v2 wave 1 |
-| Cancel-button fix (Add-bookmark dialog) | v2 wave 1 |
-| **Dashboard rebuild — full-width, sidebar hidden, drag cards by header** | v2 wave 2 |
-| **Drag bookmarks within and between cards** (Sortable shared group) | v2 wave 2 |
-| **Right-click context menus** (bookmarks + card headers) | v2 wave 2 |
-| **Per-category colors** (`<dialog>` color picker, `categories.color` column) | v2 wave 2 |
-| **Hide categories per-view** (`hidden_ids` in `settings.views_data`) | v2 wave 2 |
-| **Named views** (clone/rename/delete; `View: All ▾` dropdown in topbar) | v2 wave 2 |
-| **Internal-scroll cards** (no `+ N more` cap; `max-height: 360px` per card body) | v2 wave 2 |
+| Nested categories w/ drag-reparent · bookmarks CRUD+reorder · search · dark mode · Netscape HTML import · bcrypt auth+CSRF · Strato deploy script | v1 |
+| Dashboard view (CSS-Grid card layout) · `?r=quickadd` bookmarklet · Cancel-fix | v2 wave 1 |
+| Dashboard rebuild — full-width, sidebar hidden, drag-cards-by-header, drag bookmarks between cards (Sortable shared group), right-click menus, per-category colors via `<dialog>`, per-view hide, **named views** with topbar dropdown | v2 wave 2 |
+| **Column-wrapped masonry** — greedy shortest-column packing, debounced resize re-layout. Card-body `max-height` raised 360px → 70vh now that columns pack independently. **Per-column persistence (`view.dashboard_columns`)** added in 3a-followup so drops stay sticky across reloads; greedy is now fallback only. New `set_view_columns` API endpoint. | v2 wave 3a |
+| **Save-current-tab UX**: bookmarklet surfaced as topbar `↗ Save tools` button (out of the buried Import dialog) · **PWA + Web Share Target** (`manifest.webmanifest`, root-scope `sw.js`, `r=share` route, `views/share.php` POST handler). Native mobile share-sheet integration. Bookmarklet origin hardcoded to canonical URL. | v2 wave 3b |
+| **Cache-busted assets** (`asset('app.css')` helper appends `?v=<filemtime>` — no more hard-refresh after deploy). | v2 wave 3b |
 
 ## v2 Backlog (remaining, prioritized)
 
@@ -82,20 +71,20 @@ Schema (v2 wave 2): `settings(key,value)`, `categories(id,name,parent_id,sort_or
 
 ## Active Decisions
 <!-- Last 5. Full history in decisions.md. -->
-- 2026-05-08: **Dashboard mode hides the sidebar.** Cards are the primary nav now; tree is for list-view only. `body.dashboard-mode` class drives both sidebar visibility and the layout grid template.
-- 2026-05-08: **Card colors live on the categories table; hidden-set lives in settings (per-view).** Property-of-category vs property-of-view distinction. Avoids schema rework when phase-3 added named views.
-- 2026-05-08: **Named views stored as a single JSON in `settings.views_data`** (`{ views: [...], current_view_id }`). No `views` table — promote later if views grow more fields.
-- 2026-05-06: **Numbered-folder layout** adopted (`01_Source/`, `03_Scripts/`, etc.) to match LUCESUMBRARUM/LEARNING/KinoBerlin. Reverses the earlier root-level decision.
-- 2026-05-06: **Never add `SetHandler application/x-httpd-php` on Strato.** Strato uses PHP-FastCGI; that mod_php directive breaks execution.
+- 2026-05-08: **PWA + Web Share Target as canonical save-current-tab path.** New `manifest.webmanifest` declares the app installable and registers `/index.php?r=share` as a share target. Root-scope `sw.js` (minimal — install eligibility, network-first navigations). `views/share.php` mirrors `quickadd.php` structure (inline login preserves payload via hidden POSTs). Bookmarklet retained as desktop-only fallback. Browser extension deferred.
+- 2026-05-08: **Bookmarklet surfaced as dedicated topbar button** (`↗ Save tools`). Out of the Import dialog. Origin hardcoded to canonical URL — no more `$_SERVER['HTTP_HOST']` drift.
+- 2026-05-08: **Cache-bust assets via `?v=<filemtime>`** — single `asset()` helper in `lib/assets.php` used by all entry points. Eliminates the post-deploy hard-refresh ritual.
+- 2026-05-08: **Dashboard switched to column-wrapped masonry, then promoted to per-column persistence** (3a-followup) after the post-drag repack proved disorienting in practice. Source of truth is now `view.dashboard_columns` (array of arrays of cat IDs); greedy is fallback only. No post-drag repack — cards stay where Sortable drops them. New `set_view_columns` API endpoint.
+- 2026-05-08: **Card-body `max-height` raised from 360px → 70vh.** Wave-2's 360px cap solved a CSS-Grid row-bound problem that no longer exists with masonry.
 
 ## Blockers
 None.
 
 ## Open Questions for Next Session
-- User-driven fine-tuning of the dashboard. Topics not yet picked.
-- Add cache-busting `app.js?v=<mtime>` to `views/app.php`? (Edge-vs-Safari mismatch this session was 100% browser cache.)
+- **PWA icons** (decision G default was "skip for now"). Without `192x192` and `512x512` PNGs in `public/icons/`, the OS shows a generic placeholder when installed. Two-line `manifest.webmanifest` change once icons exist. Trivial when artwork is ready.
+- Test the **Web Share Target on a real mobile device**: install the PWA on Android/iOS, share a URL from another app, confirm "Bookmarks" appears in the share sheet and the picker form opens with prefilled URL/title. Not testable from desktop alone.
 - Strip `x-powered-by: PHP/8.4.20` (one-liner `header_remove("X-Powered-By");` in `index.php`).
-- Wave 3 scope. Recommended: tags → auto-fetch metadata → FTS5. None touched yet.
+- Wave 4 candidate (still recommended): **tags alongside categories** — biggest UX win, data already in import (`TAGS=…` attr in Bookmarkninja export currently dropped).
 
 ---
 *Source of truth for project position. Keep under 100 lines.*

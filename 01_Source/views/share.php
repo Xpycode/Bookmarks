@@ -1,31 +1,35 @@
 <?php
-// quickadd.php — Mini "save current page" popup for the bookmarklet.
+// share.php — PWA Web Share Target endpoint. Receives POST from the OS share
+// sheet (Android Chrome, iOS Safari "Add to Home Screen", Windows Edge) with
+// the shared title/text/url. Renders the same category-picker form as
+// quickadd.php so the user can choose where the bookmark lands.
 //
-// Self-contained: handles its own auth (preserves URL/title query params
-// across login redirect, which the standard login.php flow would lose).
-//
-// Flow:
-//   1. Bookmarklet opens this in a 520x640 popup with ?url=&title= query.
-//   2. If not authed → render minimal login form posting back to same URL.
-//   3. If authed → render quick-add form: pre-filled URL/title, category
-//      dropdown (loaded via /api/list), notes textarea, Save / Cancel.
-//   4. Save POSTs to existing add_bookmark API, then window.close().
-//   5. Last-used category remembered in localStorage.
+// Design parity with quickadd.php (see comments there):
+//   - Self-handled auth: inline login form preserves shared payload via hidden
+//     POST fields rather than redirecting to login.php (which would lose them).
+//   - On save, hits the existing add_bookmark API with CSRF.
+//   - Last-used category remembered in localStorage (shared key with quickadd).
 declare(strict_types=1);
 
-$urlParam   = (string)($_GET['url']   ?? '');
-$titleParam = (string)($_GET['title'] ?? '');
+// Web Share Target may put the URL into 'text' instead of 'url' on some
+// platforms (Android Chrome historically shoves the entire share text into
+// `text` even when it's just a link). Fall back to GET so direct testing
+// works (e.g. opening /index.php?r=share&url=… in a browser).
+$shareTitle = (string)($_POST['title'] ?? $_GET['title'] ?? '');
+$shareText  = (string)($_POST['text']  ?? $_GET['text']  ?? '');
+$shareUrl   = (string)($_POST['url']   ?? $_GET['url']   ?? '');
 
-// Build a query string we can use to post back to ourselves preserving params.
-$selfQs = http_build_query(['r' => 'quickadd', 'url' => $urlParam, 'title' => $titleParam]);
+if (!$shareUrl && filter_var($shareText, FILTER_VALIDATE_URL)) {
+    $shareUrl = $shareText;
+    $shareText = '';
+}
 
-// Edge case: bookmarklet used before first-run setup.
 if (!isSetup()) {
     header('Location: index.php');
     exit;
 }
 
-// Handle inline login POST (only fires when already on quickadd path).
+// Inline login. Re-POSTs to /index.php?r=share with hidden share fields.
 $loginError = '';
 if (!isAuthed() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
     if (!login((string)$_POST['password'])) {
@@ -43,7 +47,7 @@ if (!isAuthed()):
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#0f1115">
     <link rel="manifest" href="manifest.webmanifest">
-    <title>Sign in — Quick add</title>
+    <title>Sign in — Share to Bookmarks</title>
     <link rel="stylesheet" href="<?= asset('app.css') ?>">
     <script>
         (() => {
@@ -54,13 +58,16 @@ if (!isAuthed()):
     </script>
 </head>
 <body class="auth-page">
-    <form method="post" action="index.php?<?= htmlspecialchars($selfQs) ?>" class="auth-card">
+    <form method="post" action="index.php?r=share" class="auth-card">
         <h1>Sign in</h1>
-        <p style="margin:0;color:var(--text-muted);font-size:13px;">Quick-add bookmarklet — sign in to save this page.</p>
+        <p style="margin:0;color:var(--text-muted);font-size:13px;">Share to Bookmarks — sign in to save this page.</p>
         <?php if ($loginError !== ''): ?>
             <div class="auth-error"><?= htmlspecialchars($loginError) ?></div>
         <?php endif; ?>
         <label>Password<input type="password" name="password" autofocus required></label>
+        <input type="hidden" name="title" value="<?= htmlspecialchars($shareTitle) ?>">
+        <input type="hidden" name="text"  value="<?= htmlspecialchars($shareText) ?>">
+        <input type="hidden" name="url"   value="<?= htmlspecialchars($shareUrl) ?>">
         <button type="submit">Sign in</button>
     </form>
 </body>
@@ -69,8 +76,9 @@ if (!isAuthed()):
 exit;
 endif;
 
-// Authed — render quick-add form.
+// Authed — render the category-picker form.
 $csrf = csrfToken();
+$prefilledNotes = $shareText && $shareText !== $shareUrl ? $shareText : '';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="quickadd-html">
@@ -78,9 +86,9 @@ $csrf = csrfToken();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#0f1115">
-    <link rel="manifest" href="manifest.webmanifest">
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf) ?>">
-    <title>Quick add — Bookmarks</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <title>Save to Bookmarks</title>
     <link rel="stylesheet" href="<?= asset('app.css') ?>">
     <script>
         (() => {
@@ -92,12 +100,12 @@ $csrf = csrfToken();
 </head>
 <body class="quickadd-body">
     <div class="quickadd">
-        <h1>Quick add bookmark</h1>
-        <form id="quickadd-form" autocomplete="off">
-            <label>Title<input type="text" name="title" value="<?= htmlspecialchars($titleParam) ?>" maxlength="500"></label>
-            <label>URL<input type="url" name="url" value="<?= htmlspecialchars($urlParam) ?>" required placeholder="https://…"></label>
+        <h1>Save to Bookmarks</h1>
+        <form id="share-form" autocomplete="off">
+            <label>Title<input type="text" name="title" value="<?= htmlspecialchars($shareTitle) ?>" maxlength="500"></label>
+            <label>URL<input type="url" name="url" value="<?= htmlspecialchars($shareUrl) ?>" required placeholder="https://…"></label>
             <label>Category<select name="category_id" required><option value="">Loading…</option></select></label>
-            <label>Notes<textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+            <label>Notes<textarea name="notes" rows="3" maxlength="2000"><?= htmlspecialchars($prefilledNotes) ?></textarea></label>
             <div class="quickadd-actions">
                 <button type="button" class="ghost" id="cancel-btn">Cancel</button>
                 <button type="submit" class="primary" id="save-btn">Save</button>
@@ -108,7 +116,7 @@ $csrf = csrfToken();
     <script>
     (async () => {
         const csrf = document.querySelector('meta[name=csrf-token]').content;
-        const form = document.getElementById('quickadd-form');
+        const form = document.getElementById('share-form');
         const select = form.elements.category_id;
         const status = document.getElementById('status');
 
@@ -118,7 +126,6 @@ $csrf = csrfToken();
             status.hidden = false;
         };
 
-        // Load categories and build the dropdown sorted by full path.
         try {
             const res = await fetch('index.php?r=api&action=list', {
                 method: 'POST',
@@ -155,7 +162,9 @@ $csrf = csrfToken();
             return;
         }
 
-        document.getElementById('cancel-btn').addEventListener('click', () => window.close());
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            window.location.href = 'index.php';
+        });
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -180,20 +189,20 @@ $csrf = csrfToken();
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()));
                 localStorage.setItem('quickadd_last_category', String(data.category_id));
-                showStatus('Saved. Closing…', 'success');
-                setTimeout(() => window.close(), 600);
+                showStatus('Saved. Opening Bookmarks…', 'success');
+                setTimeout(() => { window.location.href = 'index.php'; }, 600);
             } catch (err) {
                 showStatus('Save failed: ' + err.message, 'error');
                 saveBtn.disabled = false;
             }
         });
 
-        // Focus URL field if title is already filled (typical bookmarklet case).
-        if (form.elements.title.value.trim()) {
-            form.elements.url.focus();
-            form.elements.url.select();
+        // Focus the field most likely to need editing. URL is usually correct
+        // from the share intent; the user normally just picks a category.
+        if (form.elements.url.value.trim()) {
+            select.focus();
         } else {
-            form.elements.title.focus();
+            form.elements.url.focus();
         }
     })();
     </script>
